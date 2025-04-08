@@ -3,13 +3,11 @@ import pandas as pd
 import plotly.graph_objects as go
 from src.nba_stats import (
     get_player_id,
-    get_player_career_stats,
-    get_latest_season_stats,
     get_all_player_stats,
     get_top_players_by_stat,
 )
 from nba_api.stats.static import players
-from src.fantasy_calc import calcular_fantasy_pontos
+from src.fantasy_calc import calcular_fantasy_pontos as fantasy_row_calc
 
 
 # Função para obter imagem do jogador
@@ -28,19 +26,24 @@ st.markdown(
     """
     <style>
         .main {
-            background-color: #black;
+            background-color: #2E2E2E;
         }
-        h1 {
-            color: #1E3A8A;
+        h1, h2, h3, .stMarkdown, .stTextInput > label, .stSelectbox > label {
+            color: #FFA500;
         }
         .block-container {
             padding: 2rem 2rem 1rem;
+            background-color: #2E2E2E;
         }
         div.stButton > button:first-child {
-            background-color: #1E3A8A;
+            background-color: #FFA500;
             color: white;
             padding: 0.6em 1.2em;
             border-radius: 8px;
+            font-weight: bold;
+        }
+        .stDataFrame, .stTable {
+            background-color: #f5f5f5;
         }
     </style>
 """,
@@ -75,64 +78,74 @@ with tabs[0]:
         if not id1 or not id2:
             st.error("Um dos jogadores não foi encontrado. Tente novamente.")
         else:
-            stats1_raw = get_player_career_stats(id1)
-            stats2_raw = get_player_career_stats(id2)
+            all_stats = get_all_player_stats()
 
-            stats1 = get_latest_season_stats(stats1_raw)
-            stats2 = get_latest_season_stats(stats2_raw)
+            row1 = all_stats[all_stats["PLAYER_NAME"] == player1_name].iloc[0]
+            row2 = all_stats[all_stats["PLAYER_NAME"] == player2_name].iloc[0]
 
-            stats1["Fantasy Points"] = calcular_fantasy_pontos(stats1)
-            stats2["Fantasy Points"] = calcular_fantasy_pontos(stats2)
+            stats1 = row1.to_dict()
+            stats2 = row2.to_dict()
 
-            if not stats1 or not stats2:
-                st.warning("Não foi possível obter estatísticas para um dos jogadores.")
-            else:
-                st.image(get_player_img_url(id1), width=200, caption=player1_name)
-                st.image(get_player_img_url(id2), width=200, caption=player2_name)
+            stats1["Fantasy Points"] = fantasy_row_calc(stats1)
+            stats2["Fantasy Points"] = fantasy_row_calc(stats2)
 
-                df_comparison = pd.DataFrame(
-                    [stats1, stats2], index=[player1_name, player2_name]
-                )
-                st.subheader("📋 Estatísticas Gerais + Fantasy Points")
-                st.dataframe(df_comparison)
+            col_img1, col_img2 = st.columns(2)
+            with col_img1:
+                st.image(get_player_img_url(id1), width=250, caption=player1_name)
+            with col_img2:
+                st.image(get_player_img_url(id2), width=250, caption=player2_name)
 
-                # Gráfico de barras
-                st.subheader("📈 Comparação Visual")
-                fig = go.Figure()
-                for player, stats in zip(
-                    [player1_name, player2_name], [stats1, stats2]
-                ):
-                    fig.add_trace(
-                        go.Bar(
-                            x=[
-                                "Pontos",
-                                "Assistências",
-                                "Rebotes",
-                                "Roubos",
-                                "Tocos",
-                                "Fantasy Points",
-                            ],
-                            y=[
-                                stats["Pontos"],
-                                stats["Assistências"],
-                                stats["Rebotes"],
-                                stats["Roubos"],
-                                stats["Tocos"],
-                                stats["Fantasy Points"],
-                            ],
-                            name=player,
-                        )
+            df_comparison = pd.DataFrame(
+                [stats1, stats2], index=[player1_name, player2_name]
+            )
+            st.subheader("📋 Estatísticas Gerais + Fantasy Points")
+            st.dataframe(df_comparison)
+
+            # Gráfico de barras
+            st.subheader("📈 Comparação Visual")
+            fig = go.Figure()
+            cores = ["#FFA500", "#FF4500"]  # laranja claro e laranja escuro
+            for idx, (player, stats) in enumerate(
+                zip([player1_name, player2_name], [stats1, stats2])
+            ):
+                fig.add_trace(
+                    go.Bar(
+                        x=[
+                            "PTS",
+                            "AST",
+                            "REB",
+                            "STL",
+                            "BLK",
+                            "Fantasy Points",
+                        ],
+                        y=[
+                            stats["PTS"],
+                            stats["AST"],
+                            stats["REB"],
+                            stats["STL"],
+                            stats["BLK"],
+                            stats["Fantasy Points"],
+                        ],
+                        name=player,
+                        marker_color=cores[idx % len(cores)],
                     )
-                fig.update_layout(
-                    barmode="group", title="Comparação de Estatísticas e Fantasy"
                 )
-                st.plotly_chart(fig, use_container_width=True)
+
+            fig.update_layout(
+                barmode="group",
+                title="Comparação de Estatísticas e Fantasy",
+                plot_bgcolor="#4F4F4F",
+                paper_bgcolor="#4F4F4F",
+                font=dict(color="white"),
+                legend=dict(bgcolor="#4F4F4F", font=dict(color="white")),
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
 # Tab 2: Top 25 por Estatística
 with tabs[1]:
     st.subheader("📋 Ver Top 25 da Temporada por Estatística")
     all_stats = get_all_player_stats()
-    all_stats["Fantasy Points"] = all_stats.apply(calcular_fantasy_pontos, axis=1)
+    all_stats["Fantasy Points"] = all_stats.apply(fantasy_row_calc, axis=1)
 
     stat_options = ["PTS", "AST", "REB", "STL", "BLK"]
     stat = st.selectbox("Estatística", stat_options)
@@ -145,7 +158,7 @@ with tabs[1]:
             x=top_players[stat][::-1],
             y=top_players["PLAYER_NAME"][::-1],
             orientation="h",
-            marker_color="indigo",
+            marker_color="#FFA500",
         )
     )
     fig_bar.update_layout(
@@ -153,6 +166,10 @@ with tabs[1]:
         xaxis_title=stat,
         yaxis_title="Jogador",
         height=750,
+        plot_bgcolor="#4F4F4F",
+        paper_bgcolor="#4F4F4F",
+        font=dict(color="white"),
+        legend=dict(bgcolor="#4F4F4F", font=dict(color="white")),
     )
     st.plotly_chart(fig_bar, use_container_width=True)
 
@@ -167,7 +184,7 @@ with tabs[2]:
             x=top_fantasy["Fantasy Points"][::-1],
             y=top_fantasy["PLAYER_NAME"][::-1],
             orientation="h",
-            marker_color="darkgreen",
+            marker_color="#FF8C00",
         )
     )
     fig_top_fantasy.update_layout(
@@ -175,12 +192,16 @@ with tabs[2]:
         xaxis_title="Fantasy Points",
         yaxis_title="Jogador",
         height=750,
+        plot_bgcolor="#4F4F4F",
+        paper_bgcolor="#4F4F4F",
+        font=dict(color="white"),
+        legend=dict(bgcolor="#4F4F4F", font=dict(color="white")),
     )
     st.plotly_chart(fig_top_fantasy, use_container_width=True)
 
 # Rodapé
 st.markdown("---")
 st.markdown(
-    "Feito por [Murilo Calore](https://github.com/mucarii)",
+    "<center>Feito por <a href='https://github.com/mucarii' style='color:#FFA500;'>Murilo Calore</a></center>",
     unsafe_allow_html=True,
 )
