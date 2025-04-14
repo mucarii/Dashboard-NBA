@@ -7,12 +7,22 @@ from src.nba_stats import (
     get_top_players_by_stat,
 )
 from nba_api.stats.static import players
+from nba_api.stats.endpoints import commonplayerinfo
 from src.fantasy_calc import calcular_fantasy_pontos as fantasy_row_calc
+import time
 
 
 # Função para obter imagem do jogador
 def get_player_img_url(player_id):
     return f"https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png"
+
+
+# Função para obter a posição do jogador
+def get_player_position(player_id):
+    time.sleep(0.6)
+    info = commonplayerinfo.CommonPlayerInfo(player_id=player_id)
+    df_info = info.get_data_frames()[0]
+    return df_info["POSITION"].values[0]
 
 
 # Lista de jogadores ativos
@@ -89,14 +99,27 @@ with tabs[0]:
             stats1["Fantasy Points"] = fantasy_row_calc(stats1)
             stats2["Fantasy Points"] = fantasy_row_calc(stats2)
 
+            # Posição dos jogadores
+            pos1 = get_player_position(id1)
+            pos2 = get_player_position(id2)
+
             col_img1, col_img2 = st.columns(2)
             with col_img1:
-                st.image(get_player_img_url(id1), width=250, caption=player1_name)
+                st.image(
+                    get_player_img_url(id1),
+                    width=250,
+                    caption=f"{player1_name} - {pos1}",
+                )
             with col_img2:
-                st.image(get_player_img_url(id2), width=250, caption=player2_name)
+                st.image(
+                    get_player_img_url(id2),
+                    width=250,
+                    caption=f"{player2_name} - {pos2}",
+                )
 
             df_comparison = pd.DataFrame(
-                [stats1, stats2], index=[player1_name, player2_name]
+                [stats1, stats2],
+                index=[f"{player1_name} ({pos1})", f"{player2_name} ({pos2})"],
             )
             st.subheader("📋 Estatísticas Gerais + Fantasy Points")
             st.dataframe(df_comparison)
@@ -104,20 +127,16 @@ with tabs[0]:
             # Gráfico de barras
             st.subheader("📈 Comparação Visual")
             fig = go.Figure()
-            cores = ["#FFA500", "#FF4500"]  # laranja claro e laranja escuro
+            cores = ["#FFA500", "#FF4500"]
             for idx, (player, stats) in enumerate(
-                zip([player1_name, player2_name], [stats1, stats2])
+                zip(
+                    [f"{player1_name} ({pos1})", f"{player2_name} ({pos2})"],
+                    [stats1, stats2],
+                )
             ):
                 fig.add_trace(
                     go.Bar(
-                        x=[
-                            "PTS",
-                            "AST",
-                            "REB",
-                            "STL",
-                            "BLK",
-                            "Fantasy Points",
-                        ],
+                        x=["PTS", "AST", "REB", "STL", "BLK", "Fantasy Points"],
                         y=[
                             stats["PTS"],
                             stats["AST"],
