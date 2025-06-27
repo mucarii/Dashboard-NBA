@@ -10,10 +10,6 @@ Este é um dashboard interativo desenvolvido com **Streamlit** para visualizar e
 - Ranking dos Top 25 jogadores por Fantasy Points
 - Visualizações com **Plotly** (barras interativas)
 
-## 📸 Exemplos de Tela
-
-> *(Você pode adicionar capturas de tela aqui usando `![screenshot](caminho/para/imagem.png)` ou subir as imagens no repositório)*
-
 ## 🚀 Como Executar
 
 ### 1. Clone o repositório
